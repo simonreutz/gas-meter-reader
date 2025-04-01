@@ -14,18 +14,17 @@ st.write("Upload a photo of your analog gas meter. The app will extract the numb
 # Upload image
 uploaded_file = st.file_uploader("Upload a gas meter photo", type=["jpg", "jpeg", "png"])
 
-if uploaded_file:
-    # Display image
-    img = Image.open(uploaded_file)
-    st.image(img, caption="Uploaded image", use_column_width=True)
+if uploaded_file:# Display uploaded image
+st.image(uploaded_file, caption="Uploaded image", use_column_width=True)
 
-    # Save to temp file
-  with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
-    img.save(tmp_file.name, format="PNG")
+# Save uploaded file to a temporary location
+with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+    tmp_file.write(uploaded_file.read())
+    tmp_file_path = tmp_file.name
 
-    # Run OCR
-    reader = easyocr.Reader(['en'], gpu=False)
-    result = reader.readtext(tmp_file.name, detail=0)
+# Run OCR on saved image file
+reader = easyocr.Reader(['en'], gpu=False)
+result = reader.readtext(tmp_file_path, detail=0)
 
     st.write("🔍 OCR Results:", result)
 
