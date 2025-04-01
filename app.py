@@ -2,57 +2,64 @@ import streamlit as st
 import easyocr
 import tempfile
 import datetime
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import json
+import pandas as pd
+import io
 
-# App title and instructions
-st.title("📸 Gas Meter Reader")
-st.write("Upload a photo of your analog gas meter. The app will extract the number using OCR and log it to your Google Sheet.")
+# App title and description
+st.title("📸 Gas Meter Reader (Offline Mode)")
+st.write("Upload a gas meter photo. The app will extract the reading and let you download it as an Excel file.")
 
 # Upload image
 uploaded_file = st.file_uploader("Upload a gas meter photo", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    # Display uploaded image
+    # Show image
     st.image(uploaded_file, caption="Uploaded image", use_column_width=True)
 
-    # Save uploaded file to a temporary location
+    # Save temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
         tmp_file.write(uploaded_file.read())
-        tmp_file_path = tmp_file.name
+        tmp_path = tmp_file.name
 
-    # Run OCR on the saved image
+    # OCR
     reader = easyocr.Reader(['en'], gpu=False)
-    result = reader.readtext(tmp_file_path, detail=0)
+    result = reader.readtext(tmp_path, detail=0)
 
-    # Show raw OCR results
     st.write("🔍 OCR Results:", result)
 
-    # Get first result as default suggestion
+    # Ask user to confirm/correct
     default_reading = result[0] if result else ""
-    reading = st.text_input("Enter the correct gas meter reading from image:", value=default_reading)
+    reading = st.text_input("Enter the correct gas meter reading:", value=default_reading)
 
-    # Ask for previous reading
     last = st.number_input("Enter last month's reading", step=0.1)
 
-    # Save to Google Sheets
-    if st.button("📤 Save to Google Sheets"):
+    if st.button("📥 Generate Download"):
         try:
             usage = float(reading) - float(last)
+            today = datetime.date.today()
 
-            # Google Sheets auth using secrets
-            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-            creds_dict = json.loads(st.secrets["general"]["GOOGLE_SHEETS_CREDS"])
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-            client = gspread.authorize(creds)
+            # Create a dataframe
+            df = pd.DataFrame([{
+                "Date": today,
+                "Meter Reading": reading,
+                "Monthly Usage": usage
+            }])
 
-            # Append data to the first worksheet
-            sheet = client.open("Gas Usage Tracker").sheet1
-            sheet.append_row([str(datetime.date.today()), reading, usage])
+            # Convert to Excel
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Gas Log')
+            excel_data = output.getvalue()
 
-            # Success message
-            st.success("✅ Entry saved to Google Sheets!")
-            st.write(f"**Date:** {datetime.date.today()}  \n**Reading:** {reading}  \n**Monthly Usage:** {usage:.2f}")
+            # Download button
+            st.download_button(
+                label="📄 Download Excel File",
+                data=excel_data,
+                file_name=f"gas-log-{today}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+            st.success("✅ Excel file ready for download!")
+
         except Exception as e:
-            st.error(f"❌ Failed to save entry: {e}")
+            st.error(f"❌ Error: {e}")
