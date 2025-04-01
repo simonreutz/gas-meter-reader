@@ -5,39 +5,54 @@ import tempfile
 import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
 
-# Title
+# App title and description
 st.title("📸 Gas Meter Reader")
-st.write("Upload a photo of your analog gas meter. The app will extract the value and log it to your Google Sheet.")
+st.write("Upload a photo of your analog gas meter. The app will extract the number and log it to your Google Sheet.")
 
-# Image upload
-uploaded_file = st.file_uploader("Upload meter photo", type=["jpg", "png", "jpeg"])
+# Upload image
+uploaded_file = st.file_uploader("Upload a gas meter photo", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
+    # Display image
     img = Image.open(uploaded_file)
     st.image(img, caption="Uploaded image", use_column_width=True)
 
-    # Save to temp file for OCR
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        img.save(tmp.name)
-        reader = easyocr.Reader(['en'])
-        result = reader.readtext(tmp.name, detail=0)
-    
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        img.save(tmp_file.name)
+
+        # Run OCR
+        reader = easyocr.Reader(['en'], gpu=False)
+        result = reader.readtext(tmp_file.name, detail=0)
+
     st.write("🔍 OCR Results:", result)
-    reading = st.text_input("Enter correct gas meter reading from image:", value=result[0] if result else "")
 
-    last = st.number_input("Enter last month's reading (for usage calculation)", step=0.1)
+    # Ask user to confirm or correct the reading
+    default_reading = result[0] if result else ""
+    reading = st.text_input("Enter the correct gas meter reading from image:", value=default_reading)
 
-    if st.button("Save to Google Sheets"):
-        # Calculate usage
-        usage = float(reading) - float(last)
+    # Ask for previous reading to calculate usage
+    last = st.number_input("Enter last month's reading", step=0.1)
 
-        # Google Sheets connection
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
-        client = gspread.authorize(creds)
+    # Save to Google Sheets
+    if st.button("📤 Save to Google Sheets"):
+        try:
+            # Calculate usage
+            usage = float(reading) - float(last)
 
-        sheet = client.open("Gas Usage Tracker").sheet1
-        sheet.append_row([str(datetime.date.today()), reading, usage])
+            # Google Sheets auth via secrets
+            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            creds_dict = json.loads(st.secrets["general"]["GOOGLE_SHEETS_CREDS"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+            client = gspread.authorize(creds)
 
-        st.success("✅ Logged to Google Sheets!")
+            # Append to sheet
+            sheet = client.open("Gas Usage Tracker").sheet1
+            sheet.append_row([str(datetime.date.today()), reading, usage])
+
+            st.success("✅ Entry saved to Google Sheets!")
+            st.write(f"**Date:** {datetime.date.today()}  \n**Reading:** {reading}  \n**Monthly Usage:** {usage:.2f}")
+        except Exception as e:
+            st.error(f"❌ Failed to log data: {e}")
