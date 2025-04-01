@@ -1,23 +1,36 @@
 import streamlit as st
 from PIL import Image
-import pytesseract
+from paddleocr import PaddleOCR
 import datetime
 import pandas as pd
 import io
 
-st.title("📸 Gas Meter Reader (Light Version)")
-st.write("Upload a gas meter photo. The app will extract the number and let you download it as Excel.")
+st.title("📸 Gas Meter Reader (Cloud Compatible)")
+st.write("Upload a gas meter photo. The app extracts the number and gives you an Excel file to download.")
 
+# Initialize OCR
+ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=False)
+
+# Upload
 uploaded_file = st.file_uploader("Upload a gas meter photo", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    image = Image.open(uploaded_file).convert("RGB")  # Ensure image is in correct format
+    image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Uploaded image", use_container_width=True)
 
-    text = pytesseract.image_to_string(image)
-    st.write("🔍 Raw OCR Text:", text)
+    # Save image to bytes
+    img_bytes = uploaded_file.read()
 
-    reading = st.text_input("Enter the gas meter reading:", value=text.strip())
+    # Run OCR
+    result = ocr.ocr(img_bytes, cls=True)
+
+    # Extract detected text
+    extracted_text = [line[1][0] for line in result[0]] if result and result[0] else []
+    st.write("🔍 OCR Results:", extracted_text)
+
+    # Suggest first number
+    default_reading = next((s for s in extracted_text if s.replace('.', '', 1).isdigit()), "")
+    reading = st.text_input("Enter the correct gas meter reading:", value=default_reading)
 
     last = st.number_input("Enter last month's reading", step=0.1)
 
