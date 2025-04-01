@@ -11,14 +11,12 @@ st.write("Upload a gas meter photo. The app will extract the number and let you 
 uploaded_file = st.file_uploader("Upload a gas meter photo", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file).convert("RGB")  # Ensure image is in correct format
     st.image(image, caption="Uploaded image", use_container_width=True)
 
-    # OCR using pytesseract
     text = pytesseract.image_to_string(image)
     st.write("🔍 Raw OCR Text:", text)
 
-    # Try to extract the number (you can improve this later with regex)
     reading = st.text_input("Enter the gas meter reading:", value=text.strip())
 
     last = st.number_input("Enter last month's reading", step=0.1)
