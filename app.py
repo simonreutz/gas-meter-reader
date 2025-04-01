@@ -14,23 +14,24 @@ st.write("Upload a photo of your analog gas meter. The app will extract the numb
 # Upload image
 uploaded_file = st.file_uploader("Upload a gas meter photo", type=["jpg", "jpeg", "png"])
 
-if uploaded_file:# Display uploaded image
-st.image(uploaded_file, caption="Uploaded image", use_column_width=True)
+if uploaded_file:
+    # Display image in Streamlit
+    st.image(uploaded_file, caption="Uploaded image", use_column_width=True)
 
-# Save uploaded file to a temporary location
-with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
-    tmp_file.write(uploaded_file.read())
-    tmp_file_path = tmp_file.name
+    # Save uploaded file to a temporary location
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        tmp_file_path = tmp_file.name
 
-# Run OCR on saved image file
-reader = easyocr.Reader(['en'], gpu=False)
-result = reader.readtext(tmp_file_path, detail=0)
+    # Run OCR on the saved image
+    reader = easyocr.Reader(['en'], gpu=False)
+    result = reader.readtext(tmp_file_path, detail=0)
 
+    # Show results
     st.write("🔍 OCR Results:", result)
-
-    # Ask user to confirm or correct the reading
     default_reading = result[0] if result else ""
     reading = st.text_input("Enter the correct gas meter reading from image:", value=default_reading)
+
 
     # Ask for previous reading to calculate usage
     last = st.number_input("Enter last month's reading", step=0.1)
