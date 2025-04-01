@@ -20,12 +20,12 @@ if uploaded_file:
     st.image(img, caption="Uploaded image", use_column_width=True)
 
     # Save to temp file
-    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-        img.save(tmp_file.name)
+  with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+    img.save(tmp_file.name, format="PNG")
 
-        # Run OCR
-        reader = easyocr.Reader(['en'], gpu=False)
-        result = reader.readtext(tmp_file.name, detail=0)
+    # Run OCR
+    reader = easyocr.Reader(['en'], gpu=False)
+    result = reader.readtext(tmp_file.name, detail=0)
 
     st.write("🔍 OCR Results:", result)
 
